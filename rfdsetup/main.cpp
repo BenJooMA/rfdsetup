@@ -12,6 +12,7 @@
 #define CMD_TIMEOUT			250
 #define ISSUE_CMD_TIMEOUT	250
 #define MAX_READ_LEN		1024
+#define MAX_TRIES			10
 #define	AIR_SPEED			125
 #define MAX_WINDOW			20
 
@@ -39,6 +40,13 @@ void EnterBootloaderMode();
 void ShowChipID();
 void InitiateUpload();
 void UploadFirmware();
+void UploadData(char* data, std::streamsize len);
+void UploadPacket(char* data, int id);
+void Reboot();
+uint16_t CalculateCRC(char* data, int len);
+
+
+void Sync();
 
 
 auto usb = std::make_shared<SerialConnection>(BAUD_RATE);
@@ -75,6 +83,8 @@ int main(int argc, char** argv)
 
 	Wait(CMD_TIMEOUT);
 
+	/**/
+
 	EnterBootloaderMode();
 
 	Wait(CMD_TIMEOUT);
@@ -87,9 +97,39 @@ int main(int argc, char** argv)
 
 	Wait(CMD_TIMEOUT);
 
-	UploadFirmware();
+	for (int i = 0; i < 10; i++)
+	{
+		Sync();
+	}
 
 	return 1;
+
+	for (int i = 0; i < 10; i++)
+	{
+		std::cout << usb->ReadByte();
+	}
+
+	return 1;
+
+	UploadFirmware();
+
+	Wait(CMD_TIMEOUT);
+
+	Reboot();
+
+	Wait(10000);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowFirmwareVersion();
+
+	Wait(CMD_TIMEOUT);
+
+	//return 1;
+
+	/**/
 
 	ShowCurrentParams();
 
@@ -332,24 +372,167 @@ void UploadFirmware()
 	std::cin >> path_str;
 	if ((path_str == "d") || (path_str == "D"))
 	{
-		std::ifstream fw("C:\\tmp\\rfd\\fw.gbl", std::ios::binary | std::ios::ate);
+		//std::ifstream fw("C:\\tmp\\rfd\\fw.gbl", std::ios::binary | std::ios::ate);
+		std::ifstream fw("C:\\tmp\\rfd\\fw_3.38.bin", std::ios::binary | std::ios::ate);
 		if (!fw.is_open())
 		{
 			std::cerr << "Could not open file..." << std::endl;
 			return;
 		}
-
-		std::streamsize sz = fw.tellg();
+	
+		std::streamsize len = fw.tellg();
 		fw.seekg(0, std::ios::beg);
-		char* data = new char[sz];
-		if (fw.read(data, sz))
+		char* data = new char[len];
+		if (fw.read(data, len))
 		{
-			std::cout << "Successfully read " << sz << " bytes into 'data'..." << std::endl;
+			std::cout << "Successfully read " << len << " bytes into 'data'..." << std::endl;
+
+			usb->SetBaudRate(115200);
+			Wait(100);
+			usb->FlushBuffers();
+			Wait(100);
+			usb->SetReadTimeout(2000);
+			Wait(100);
+			UploadData(data, len);
+			Wait(100);
+			usb->SetBaudRate(BAUD_RATE);
+			Wait(100);
+			usb->WriteByte(0x04);
+			Wait(100);
 		}
 		delete[] data;
 	}
 	else
 	{
 		std::cout << "Path not recognized..." << std::endl;
+	}
+}
+
+
+void UploadData(char* data, std::streamsize len)
+{
+	int num_packets = (len % 128 == 0) ? (len / 128) : (len / 128 + 1);
+	std::cout << "Number of packets required: " << num_packets << std::endl;
+	std::cout << std::endl;
+
+	int read_index = 0;
+	for (int i = 0; i < num_packets; i++)
+	{
+		char chunk[128] = { 0 };
+		memset(chunk, 0x26, 128);
+		memcpy(chunk, &data[read_index], 128);
+		read_index += 128;
+		std::cout << "Uploading packet " << (i + 1) << "/" << num_packets << " ";
+		UploadPacket(chunk, i + 1);
+	}
+	std::cout << std::endl;
+}
+
+
+void UploadPacket(char* data, int id)
+{
+	char packet[133] = { 0 };
+
+	packet[0] = 0x01;
+	packet[1] = static_cast<char>(id % 256);
+	packet[2] = static_cast<char>(255 - (id % 256));
+	memcpy(&packet[3], data, 128);
+	uint16_t crc = CalculateCRC(data, 128);
+	packet[131] = static_cast<char>(crc >> 8);
+	packet[132] = static_cast<char>(crc);
+
+	//for (int i = 0; i < MAX_TRIES; i++)
+	bool success = false;
+	while (!success)
+	{
+		usb->FlushBuffers();
+		if (usb->Write(packet, 133))
+		{
+			unsigned char c = 0;
+			do
+			{
+				c = usb->ReadByte();
+			} while (c == 67);
+
+			switch (c)
+			{
+				case 0x06:
+				{
+					std::cout << "ACK" << std::endl;
+					success = true;
+				}
+				break;
+				case 0x15:
+				{
+					std::cout << "-";
+				}
+				break;
+				case 0x18:
+				{
+					std::cout << "o";
+				}
+				break;
+				default:
+				{
+					std::cout << ".";
+				}
+				break;
+			}
+		}
+	}
+}
+
+
+void Reboot()
+{
+	// \r\n
+	char newline[2] = { 0x0D, 0x0A };
+	IssueCommand(newline, 2);
+	// BOOTNEW\r\n
+	char cmd[9] = { 0x42, 0x4F, 0x4F, 0x54, 0x4E, 0x45, 0x57, 0x0D, 0x0A };
+	IssueCommand(cmd, 9);
+}
+
+
+uint16_t CalculateCRC(char* data, int len)
+{
+	uint16_t result = 0;
+	for (int i = 0; i < len; i++)
+	{
+		result = static_cast<uint16_t>(result >> 8 | static_cast<int>(result) << 8);
+		result ^= static_cast<uint16_t>(data[i]);
+		result ^= static_cast<uint16_t>((result & 0xFF) >> 4);
+		result ^= static_cast<uint16_t>(result << 12);
+		result ^= static_cast<uint16_t>((result & 0xFF) << 5);
+	}
+	return result;
+}
+
+
+void Sync()
+{
+	usb->FlushBuffers();
+
+	char cmd[2] = { 0x21, 0x20 };
+	IssueCommand(cmd, 2);
+
+	if (usb->Write(cmd, 2))
+	{
+		Wait(ISSUE_CMD_TIMEOUT);
+
+		byte result = usb->ReadByte();
+
+		if (result == 0x12)
+		{
+			std::cout << "In sync!" << std::endl;
+		}
+		else
+		{
+			std::cout << "Not in sync..." << std::endl;
+		}
+	}
+	else
+	{
+		std::cout << "Could not write to serial port..." << std::endl;
 	}
 }
