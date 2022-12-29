@@ -9,12 +9,49 @@
 
 
 #define BAUD_RATE			57600
+#define PACKET_SIZE			128
 #define CMD_TIMEOUT			250
-#define ISSUE_CMD_TIMEOUT	250
+#define ISSUE_CMD_TIMEOUT	1000
 #define MAX_READ_LEN		1024
 #define MAX_TRIES			10
 #define	AIR_SPEED			125
 #define MAX_WINDOW			20
+
+
+static const uint16_t crc16tab[256] = {
+	0x0000,0x1021,0x2042,0x3063,0x4084,0x50a5,0x60c6,0x70e7,
+	0x8108,0x9129,0xa14a,0xb16b,0xc18c,0xd1ad,0xe1ce,0xf1ef,
+	0x1231,0x0210,0x3273,0x2252,0x52b5,0x4294,0x72f7,0x62d6,
+	0x9339,0x8318,0xb37b,0xa35a,0xd3bd,0xc39c,0xf3ff,0xe3de,
+	0x2462,0x3443,0x0420,0x1401,0x64e6,0x74c7,0x44a4,0x5485,
+	0xa56a,0xb54b,0x8528,0x9509,0xe5ee,0xf5cf,0xc5ac,0xd58d,
+	0x3653,0x2672,0x1611,0x0630,0x76d7,0x66f6,0x5695,0x46b4,
+	0xb75b,0xa77a,0x9719,0x8738,0xf7df,0xe7fe,0xd79d,0xc7bc,
+	0x48c4,0x58e5,0x6886,0x78a7,0x0840,0x1861,0x2802,0x3823,
+	0xc9cc,0xd9ed,0xe98e,0xf9af,0x8948,0x9969,0xa90a,0xb92b,
+	0x5af5,0x4ad4,0x7ab7,0x6a96,0x1a71,0x0a50,0x3a33,0x2a12,
+	0xdbfd,0xcbdc,0xfbbf,0xeb9e,0x9b79,0x8b58,0xbb3b,0xab1a,
+	0x6ca6,0x7c87,0x4ce4,0x5cc5,0x2c22,0x3c03,0x0c60,0x1c41,
+	0xedae,0xfd8f,0xcdec,0xddcd,0xad2a,0xbd0b,0x8d68,0x9d49,
+	0x7e97,0x6eb6,0x5ed5,0x4ef4,0x3e13,0x2e32,0x1e51,0x0e70,
+	0xff9f,0xefbe,0xdfdd,0xcffc,0xbf1b,0xaf3a,0x9f59,0x8f78,
+	0x9188,0x81a9,0xb1ca,0xa1eb,0xd10c,0xc12d,0xf14e,0xe16f,
+	0x1080,0x00a1,0x30c2,0x20e3,0x5004,0x4025,0x7046,0x6067,
+	0x83b9,0x9398,0xa3fb,0xb3da,0xc33d,0xd31c,0xe37f,0xf35e,
+	0x02b1,0x1290,0x22f3,0x32d2,0x4235,0x5214,0x6277,0x7256,
+	0xb5ea,0xa5cb,0x95a8,0x8589,0xf56e,0xe54f,0xd52c,0xc50d,
+	0x34e2,0x24c3,0x14a0,0x0481,0x7466,0x6447,0x5424,0x4405,
+	0xa7db,0xb7fa,0x8799,0x97b8,0xe75f,0xf77e,0xc71d,0xd73c,
+	0x26d3,0x36f2,0x0691,0x16b0,0x6657,0x7676,0x4615,0x5634,
+	0xd94c,0xc96d,0xf90e,0xe92f,0x99c8,0x89e9,0xb98a,0xa9ab,
+	0x5844,0x4865,0x7806,0x6827,0x18c0,0x08e1,0x3882,0x28a3,
+	0xcb7d,0xdb5c,0xeb3f,0xfb1e,0x8bf9,0x9bd8,0xabbb,0xbb9a,
+	0x4a75,0x5a54,0x6a37,0x7a16,0x0af1,0x1ad0,0x2ab3,0x3a92,
+	0xfd2e,0xed0f,0xdd6c,0xcd4d,0xbdaa,0xad8b,0x9de8,0x8dc9,
+	0x7c26,0x6c07,0x5c64,0x4c45,0x3ca2,0x2c83,0x1ce0,0x0cc1,
+	0xef1f,0xff3e,0xcf5d,0xdf7c,0xaf9b,0xbfba,0x8fd9,0x9ff8,
+	0x6e17,0x7e36,0x4e55,0x5e74,0x2e93,0x3eb2,0x0ed1,0x1ef0
+};
 
 
 void Wait(unsigned int milliseconds);
@@ -40,13 +77,36 @@ void EnterBootloaderMode();
 void ShowChipID();
 void InitiateUpload();
 void UploadFirmware();
-void UploadData(char* data, std::streamsize len);
-void UploadPacket(char* data, int id);
+void UploadData(unsigned char* data, std::streamsize len);
+void ExportPacket(std::ofstream& output, unsigned char* data, int id);
+void UploadPacket(unsigned char* data, int id);
 void Reboot();
-uint16_t CalculateCRC(char* data, int len);
+uint16_t CalculateCRC(unsigned char* data, int len);
 
 
 void Sync();
+
+
+#define SOH  0x01
+#define STX  0x02
+#define EOT  0x04
+#define ACK  0x06
+#define NAK  0x15
+#define CAN  0x18
+#define CTRLZ 0x1A
+
+#define DLY_1S 1000
+#define MAXRETRANS 25
+#define TRANSMIT_XMODEM_1K
+
+
+//int xmodemTransmit(unsigned char* src, int srcsz);
+
+
+static char hex_table[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
+								'8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
+std::string ToHex(uint8_t in, char delimiter = ' ');
 
 
 auto usb = std::make_shared<SerialConnection>(BAUD_RATE);
@@ -73,6 +133,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	/*
 	Wait(CMD_TIMEOUT);
 
 	EnterATCommandMode();
@@ -83,8 +144,6 @@ int main(int argc, char** argv)
 
 	Wait(CMD_TIMEOUT);
 
-	/**/
-
 	EnterBootloaderMode();
 
 	Wait(CMD_TIMEOUT);
@@ -92,24 +151,31 @@ int main(int argc, char** argv)
 	ShowChipID();
 
 	Wait(CMD_TIMEOUT);
+	*/
 
 	InitiateUpload();
 
 	Wait(CMD_TIMEOUT);
 
+	/*
+	while (1)
+	{
+		std::cout << usb->ReadByte();
+	}
+	*/
+	/*
 	for (int i = 0; i < 10; i++)
 	{
 		Sync();
 	}
 
 	return 1;
+	*/
 
 	for (int i = 0; i < 10; i++)
 	{
-		std::cout << usb->ReadByte();
+		std::cout << "Received: " << usb->ReadByte() << std::endl;
 	}
-
-	return 1;
 
 	UploadFirmware();
 
@@ -122,6 +188,8 @@ int main(int argc, char** argv)
 	EnterATCommandMode();
 
 	Wait(CMD_TIMEOUT);
+
+	EnterATCommandMode();
 
 	ShowFirmwareVersion();
 
@@ -209,6 +277,8 @@ void Wait(unsigned int seconds)
 
 void IssueCommand(char* cmd, int len)
 {
+	usb->FlushBuffers();
+
 	if (usb->Write(cmd, len))
 	{
 		Wait(ISSUE_CMD_TIMEOUT);
@@ -352,16 +422,16 @@ void EnterBootloaderMode()
 void ShowChipID()
 {
 	// CHIPID\r
-	char cmd[7] = { 0x43, 0x48, 0x49, 0x50, 0x49, 0x44, 0x0D };
-	IssueCommand(cmd, 7);
+	char cmd[8] = { 0x43, 0x48, 0x49, 0x50, 0x49, 0x44, 0x0D, 0x0A };
+	IssueCommand(cmd, 8);
 }
 
 
 void InitiateUpload()
 {
 	// UPLOAD\r
-	char cmd[7] = { 0x55, 0x50, 0x4C, 0x4F, 0x41, 0x44, 0x0D };
-	IssueCommand(cmd, 7);
+	char cmd[8] = { 0x55, 0x50, 0x4C, 0x4F, 0x41, 0x44, 0x0D, 0x0A };
+	IssueCommand(cmd, 8);
 }
 
 
@@ -372,8 +442,8 @@ void UploadFirmware()
 	std::cin >> path_str;
 	if ((path_str == "d") || (path_str == "D"))
 	{
-		//std::ifstream fw("C:\\tmp\\rfd\\fw.gbl", std::ios::binary | std::ios::ate);
-		std::ifstream fw("C:\\tmp\\rfd\\fw_3.38.bin", std::ios::binary | std::ios::ate);
+		std::ifstream fw("C:\\tmp\\rfd\\fw.gbl", std::ios::binary | std::ios::ate);
+		//std::ifstream fw("C:\\tmp\\rfd\\fw_3.38.bin", std::ios::binary | std::ios::ate);
 		if (!fw.is_open())
 		{
 			std::cerr << "Could not open file..." << std::endl;
@@ -382,18 +452,26 @@ void UploadFirmware()
 	
 		std::streamsize len = fw.tellg();
 		fw.seekg(0, std::ios::beg);
-		char* data = new char[len];
-		if (fw.read(data, len))
+		unsigned char* data = new unsigned char[len];
+		if (fw.read((char*)data, len))
 		{
+			/*
+			for (int i = 0; i < (int)len; i++)
+			{
+				std::cout << data[i];
+			}
+			*/
+
 			std::cout << "Successfully read " << len << " bytes into 'data'..." << std::endl;
 
-			usb->SetBaudRate(115200);
+			//usb->SetBaudRate(115200);
 			Wait(100);
 			usb->FlushBuffers();
 			Wait(100);
 			usb->SetReadTimeout(2000);
 			Wait(100);
 			UploadData(data, len);
+			//xmodemTransmit((unsigned char*)data, len);
 			Wait(100);
 			usb->SetBaudRate(BAUD_RATE);
 			Wait(100);
@@ -409,50 +487,85 @@ void UploadFirmware()
 }
 
 
-void UploadData(char* data, std::streamsize len)
+void UploadData(unsigned char* data, std::streamsize len)
 {
-	int num_packets = (len % 128 == 0) ? (len / 128) : (len / 128 + 1);
+	int num_packets = (len % PACKET_SIZE == 0) ? (len / PACKET_SIZE) : (len / PACKET_SIZE + 1);
 	std::cout << "Number of packets required: " << num_packets << std::endl;
 	std::cout << std::endl;
+
+	//std::ofstream hex_fw("C:\\tmp\\rfd\\fw.txt");
 
 	int read_index = 0;
 	for (int i = 0; i < num_packets; i++)
 	{
-		char chunk[128] = { 0 };
-		memset(chunk, 0x26, 128);
-		memcpy(chunk, &data[read_index], 128);
-		read_index += 128;
+		unsigned char chunk[PACKET_SIZE] = { 0 };
+		memset(chunk, 0x26, PACKET_SIZE);
+		memcpy(chunk, &data[read_index], PACKET_SIZE);
+		read_index += PACKET_SIZE;
 		std::cout << "Uploading packet " << (i + 1) << "/" << num_packets << " ";
 		UploadPacket(chunk, i + 1);
+		//ExportPacket(hex_fw, chunk, i + 1);
 	}
 	std::cout << std::endl;
 }
 
 
-void UploadPacket(char* data, int id)
+void ExportPacket(std::ofstream& output, unsigned char* data, int id)
 {
 	char packet[133] = { 0 };
 
 	packet[0] = 0x01;
-	packet[1] = static_cast<char>(id % 256);
-	packet[2] = static_cast<char>(255 - (id % 256));
+	packet[1] = static_cast<unsigned char>(id % 256);
+	packet[2] = static_cast<unsigned char>(255 - (id % 256));
 	memcpy(&packet[3], data, 128);
 	uint16_t crc = CalculateCRC(data, 128);
-	packet[131] = static_cast<char>(crc >> 8);
-	packet[132] = static_cast<char>(crc);
+	packet[131] = static_cast<unsigned char>(crc >> 8) & 0xFF;
+	packet[132] = static_cast<unsigned char>(crc) & 0xFF;
 
-	//for (int i = 0; i < MAX_TRIES; i++)
+	for (int i = 0; i < 133; i++)
+	{
+		output << ToHex(packet[i]);
+	}
+	output << std::endl;
+}
+
+
+void UploadPacket(unsigned char* data, int id)
+{
+	char packet[PACKET_SIZE + 5] = { 0 };
+
+	packet[0] = 0x01;
+	packet[1] = static_cast<unsigned char>(id % 256);
+	packet[2] = static_cast<unsigned char>(255 - (id % 256));
+	memcpy(&packet[3], data, PACKET_SIZE);
+	uint16_t crc = CalculateCRC(data, PACKET_SIZE);
+	packet[PACKET_SIZE + 3] = static_cast<unsigned char>(crc >> 8) & 0xFF;
+	packet[PACKET_SIZE + 4] = static_cast<unsigned char>(crc) & 0xFF;
+
+	/*
+	std::cout << std::endl;
+	for (int i = 0; i < (PACKET_SIZE + 5); i++)
+	{
+		std::cout << ToHex(packet[i]);
+	}
+	std::cout << std::endl;
+	*/
+
+	Wait(250);
 	bool success = false;
 	while (!success)
 	{
 		usb->FlushBuffers();
-		if (usb->Write(packet, 133))
+
+		if (usb->Write(packet, (PACKET_SIZE + 5)))
 		{
+			//usb->FlushBuffers();
+
+			Wait(100);
+
 			unsigned char c = 0;
-			do
-			{
-				c = usb->ReadByte();
-			} while (c == 67);
+
+			c = usb->ReadByte();
 
 			switch (c)
 			{
@@ -475,6 +588,7 @@ void UploadPacket(char* data, int id)
 				default:
 				{
 					std::cout << ".";
+					//std::cout << c;
 				}
 				break;
 			}
@@ -494,8 +608,9 @@ void Reboot()
 }
 
 
-uint16_t CalculateCRC(char* data, int len)
+uint16_t CalculateCRC(unsigned char* data, int len)
 {
+	/*
 	uint16_t result = 0;
 	for (int i = 0; i < len; i++)
 	{
@@ -506,6 +621,14 @@ uint16_t CalculateCRC(char* data, int len)
 		result ^= static_cast<uint16_t>((result & 0xFF) << 5);
 	}
 	return result;
+	*/
+
+	uint16_t crc = 0;
+	for (int i = 0; i < len; i++)
+	{
+		crc = (crc << 8) ^ crc16tab[((crc >> 8) ^ *data++) & 0x00FF];
+	}
+	return crc;
 }
 
 
@@ -535,4 +658,142 @@ void Sync()
 	{
 		std::cout << "Could not write to serial port..." << std::endl;
 	}
+}
+
+/*
+int xmodemTransmit(unsigned char* src, int srcsz)
+{
+	unsigned char xbuff[1030]; // 1024 for XModem 1k + 3 head chars + 2 crc + nul
+	int bufsz, crc = -1;
+	unsigned char packetno = 1;
+	int i, c, len = 0;
+	int retry;
+
+	for (;;)
+	{
+		for (retry = 0; retry < 16; ++retry)
+		{
+			if ((c = usb->ReadByte()) >= 0)
+			{
+				//std::cout << c;
+				switch (c)
+				{
+				case 'C':
+					crc = 1;
+					goto start_trans;
+				case NAK:
+					crc = 0;
+					goto start_trans;
+				case CAN:
+					if ((c = usb->ReadByte()) == CAN)
+					{
+						usb->WriteByte(ACK);
+						usb->FlushBuffers();
+						return -1;
+					}
+					break;
+				default:
+					break;
+				}
+			}
+		}
+		usb->WriteByte(CAN);
+		usb->WriteByte(CAN);
+		usb->WriteByte(CAN);
+		usb->FlushBuffers();
+		return -2; // no sync 
+
+		for (;;)
+		{
+		start_trans:
+#ifdef TRANSMIT_XMODEM_1K
+			xbuff[0] = STX; bufsz = 1024;
+#else
+			xbuff[0] = SOH; bufsz = 128;
+#endif
+			xbuff[1] = packetno;
+			xbuff[2] = ~packetno;
+			c = srcsz - len;
+			if (c > bufsz) c = bufsz;
+			if (c > 0)
+			{
+				memset(&xbuff[3], 0, bufsz);
+				memcpy(&xbuff[3], &src[len], c);
+				if (c < bufsz) xbuff[3 + c] = CTRLZ;
+				if (crc)
+				{
+					unsigned short ccrc = CalculateCRC((char*)&xbuff[3], bufsz);
+					xbuff[bufsz + 3] = (ccrc >> 8) & 0xFF;
+					xbuff[bufsz + 4] = ccrc & 0xFF;
+				}
+				else
+				{
+					unsigned char ccks = 0;
+					for (i = 3; i < bufsz + 3; ++i)
+					{
+						ccks += xbuff[i];
+					}
+					xbuff[bufsz + 3] = ccks;
+				}
+				for (retry = 0; retry < MAXRETRANS; ++retry)
+				{
+					for (i = 0; i < bufsz + 4 + (crc ? 1 : 0); ++i)
+					{
+						usb->WriteByte(xbuff[i]);
+					}
+					if ((c = usb->ReadByte()) >= 0)
+					{
+						//std::cout << c;
+						switch (c)
+						{
+						case ACK:
+							++packetno;
+							len += bufsz;
+							goto start_trans;
+						case CAN:
+							if ((c = usb->ReadByte()) == CAN)
+							{
+								usb->WriteByte(ACK);
+								usb->FlushBuffers();
+								return -1; // canceled by remote
+							}
+							break;
+						case NAK:
+						default:
+							break;
+						}
+					}
+				}
+				usb->WriteByte(CAN);
+				usb->WriteByte(CAN);
+				usb->WriteByte(CAN);
+				usb->FlushBuffers();
+				return -4; // xmit error
+			}
+			else
+			{
+				for (retry = 0; retry < 10; ++retry)
+				{
+					usb->WriteByte(EOT);
+					if ((c = usb->ReadByte()) == ACK) break;
+				}
+				usb->FlushBuffers();
+				return (c == ACK) ? len : -5;
+			}
+		}
+	}
+}
+*/
+
+std::string ToHex(uint8_t in, char delimiter)
+{
+	int num = static_cast<int>(in);
+
+	std::string out = "";
+
+	out += hex_table[num / 16];
+	out += hex_table[num % 16];
+	out += delimiter;
+
+	return out;
 }
