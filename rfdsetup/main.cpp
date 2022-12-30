@@ -54,12 +54,20 @@ static const uint16_t crc16tab[256] = {
 };
 
 
+static char hex_table[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
+								'8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
+
+bool SerialConnect();
+bool SerialDisconnect();
+
+
+bool GroundSideSetup();
+bool AirSideSetup();
+
+
 void Wait(unsigned int milliseconds);
-
-
 void IssueCommand(char* cmd, int len);
-
-
 void EnterATCommandMode();
 void ShowFirmwareVersion();
 void ShowCurrentParams();
@@ -68,44 +76,19 @@ void SetAirSpeed();
 void SetMaxWindow();
 void SetNetID(uint8_t id);
 void SetAllGPIOPinsToZero();
-
-
 void SaveSettings();
-
-
 void EnterBootloaderMode();
 void ShowChipID();
 void InitiateUpload();
 void UploadFirmware();
 void UploadData(unsigned char* data, std::streamsize len);
+void ExportData(unsigned char* data, std::streamsize len);
 void ExportPacket(std::ofstream& output, unsigned char* data, int id);
 void UploadPacket(unsigned char* data, int id);
 void Reboot();
+
+
 uint16_t CalculateCRC(unsigned char* data, int len);
-
-
-void Sync();
-
-
-#define SOH  0x01
-#define STX  0x02
-#define EOT  0x04
-#define ACK  0x06
-#define NAK  0x15
-#define CAN  0x18
-#define CTRLZ 0x1A
-
-#define DLY_1S 1000
-#define MAXRETRANS 25
-#define TRANSMIT_XMODEM_1K
-
-
-//int xmodemTransmit(unsigned char* src, int srcsz);
-
-
-static char hex_table[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
-								'8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
-
 std::string ToHex(uint8_t in, char delimiter = ' ');
 
 
@@ -114,7 +97,23 @@ auto usb = std::make_shared<SerialConnection>(BAUD_RATE);
 
 int main(int argc, char** argv)
 {
-	std::cout << "Connect air-side module / power-cycle if already connected..." << std::endl;
+	if (!GroundSideSetup())
+	{
+		return 1;
+	}
+
+	if (!AirSideSetup())
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+
+bool GroundSideSetup()
+{
+	std::cout << "Connect ground-side module (killbox) / power-cycle if already connected..." << std::endl;
 	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
 	char tmp = 0;
 	std::cin >> tmp;
@@ -122,18 +121,16 @@ int main(int argc, char** argv)
 	if (!((tmp == 'c') || (tmp == 'C')))
 	{
 		std::cout << "Quitting..." << std::endl;
-		return 1;
+		return false;
 	}
 
 	Wait(3000);
 
-	int port_to_check = 0;
-	if (!usb->FindNextOpenPort(port_to_check))
+	if (!SerialConnect())
 	{
-		return 1;
+		return false;
 	}
 
-	/*
 	Wait(CMD_TIMEOUT);
 
 	EnterATCommandMode();
@@ -148,34 +145,13 @@ int main(int argc, char** argv)
 
 	Wait(CMD_TIMEOUT);
 
-	ShowChipID();
-
-	Wait(CMD_TIMEOUT);
-	*/
-
 	InitiateUpload();
 
 	Wait(CMD_TIMEOUT);
 
-	/*
-	while (1)
-	{
-		std::cout << usb->ReadByte();
-	}
-	*/
-	/*
-	for (int i = 0; i < 10; i++)
-	{
-		Sync();
-	}
+	std::cout << usb->ReadByte() << std::endl;
 
-	return 1;
-	*/
-
-	for (int i = 0; i < 10; i++)
-	{
-		std::cout << "Received: " << usb->ReadByte() << std::endl;
-	}
+	Wait(CMD_TIMEOUT);
 
 	UploadFirmware();
 
@@ -183,21 +159,93 @@ int main(int argc, char** argv)
 
 	Reboot();
 
-	Wait(10000);
+	Wait(5000);
 
 	EnterATCommandMode();
 
 	Wait(CMD_TIMEOUT);
-
-	EnterATCommandMode();
 
 	ShowFirmwareVersion();
 
 	Wait(CMD_TIMEOUT);
 
-	//return 1;
+	if (!SerialDisconnect())
+	{
+		return false;
+	}
 
-	/**/
+	std::cout << "Disconnect ground-side module" << std::endl;
+	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
+	tmp = 0;
+	std::cin >> tmp;
+
+	if (!((tmp == 'c') || (tmp == 'C')))
+	{
+		std::cout << "Quitting..." << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
+
+bool AirSideSetup()
+{
+	std::cout << "Connect air-side module / power-cycle if already connected..." << std::endl;
+	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
+	char tmp = 0;
+	std::cin >> tmp;
+
+	if (!((tmp == 'c') || (tmp == 'C')))
+	{
+		std::cout << "Quitting..." << std::endl;
+		return false;
+	}
+
+	Wait(3000);
+
+	if (!SerialConnect())
+	{
+		return false;
+	}
+
+	Wait(CMD_TIMEOUT);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowFirmwareVersion();
+
+	Wait(CMD_TIMEOUT);
+
+	EnterBootloaderMode();
+
+	Wait(CMD_TIMEOUT);
+
+	InitiateUpload();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << usb->ReadByte() << std::endl;
+
+	Wait(CMD_TIMEOUT);
+
+	UploadFirmware();
+
+	Wait(CMD_TIMEOUT);
+
+	Reboot();
+
+	Wait(5000);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowFirmwareVersion();
+
+	Wait(CMD_TIMEOUT);
 
 	ShowCurrentParams();
 
@@ -222,7 +270,7 @@ int main(int argc, char** argv)
 	{
 		temp_id = std::stoi(net_id_str);
 	}
-	catch (const std::exception& e)
+	catch (const std::exception & e)
 	{
 		std::cerr << e.what() << std::endl;
 		return 1;
@@ -259,13 +307,34 @@ int main(int argc, char** argv)
 
 	Wait(CMD_TIMEOUT);
 
+	if (!SerialDisconnect())
+	{
+		return false;
+	}
+
+	return true;
+}
+
+
+bool SerialConnect()
+{
+	int port_to_check = 0;
+	if (!usb->FindNextOpenPort(port_to_check))
+	{
+		return false;
+	}
+	return true;
+}
+
+
+bool SerialDisconnect()
+{
 	if (!usb->Disconnect())
 	{
 		std::cerr << "Failed to disconnect serial port..." << std::endl;
-		return 1;
+		return false;
 	}
-
-	return 0;
+	return true;
 }
 
 
@@ -442,8 +511,8 @@ void UploadFirmware()
 	std::cin >> path_str;
 	if ((path_str == "d") || (path_str == "D"))
 	{
-		std::ifstream fw("C:\\tmp\\rfd\\fw.gbl", std::ios::binary | std::ios::ate);
-		//std::ifstream fw("C:\\tmp\\rfd\\fw_3.38.bin", std::ios::binary | std::ios::ate);
+		std::ifstream fw("C:\\tmp\\rfd\\fw_3_54.gbl", std::ios::binary | std::ios::ate);
+		//std::ifstream fw("C:\\tmp\\rfd\\fw_4_03.gbl", std::ios::binary | std::ios::ate);
 		if (!fw.is_open())
 		{
 			std::cerr << "Could not open file..." << std::endl;
@@ -455,23 +524,15 @@ void UploadFirmware()
 		unsigned char* data = new unsigned char[len];
 		if (fw.read((char*)data, len))
 		{
-			/*
-			for (int i = 0; i < (int)len; i++)
-			{
-				std::cout << data[i];
-			}
-			*/
-
 			std::cout << "Successfully read " << len << " bytes into 'data'..." << std::endl;
 
 			//usb->SetBaudRate(115200);
-			Wait(100);
+			//Wait(100);
 			usb->FlushBuffers();
 			Wait(100);
 			usb->SetReadTimeout(2000);
 			Wait(100);
 			UploadData(data, len);
-			//xmodemTransmit((unsigned char*)data, len);
 			Wait(100);
 			usb->SetBaudRate(BAUD_RATE);
 			Wait(100);
@@ -493,7 +554,34 @@ void UploadData(unsigned char* data, std::streamsize len)
 	std::cout << "Number of packets required: " << num_packets << std::endl;
 	std::cout << std::endl;
 
-	//std::ofstream hex_fw("C:\\tmp\\rfd\\fw.txt");
+	int read_index = 0;
+	for (int i = 0; i < num_packets; i++)
+	{
+		unsigned char chunk[PACKET_SIZE] = { 0 };
+		memset(chunk, 0x26, PACKET_SIZE);
+		memcpy(chunk, &data[read_index], PACKET_SIZE);
+		read_index += PACKET_SIZE;
+
+		int percentage = static_cast<int>(static_cast<float>(i + 1) / static_cast<float>(num_packets) * 100.0f);
+		std::cout << "\rUploading firmware - " << percentage << "%";
+
+		UploadPacket(chunk, i + 1);
+	}
+	std::cout << std::endl;
+}
+
+
+void ExportData(unsigned char* data, std::streamsize len)
+{
+	int num_packets = (len % PACKET_SIZE == 0) ? (len / PACKET_SIZE) : (len / PACKET_SIZE + 1);
+	std::cout << "Number of packets required: " << num_packets << std::endl;
+	std::cout << std::endl;
+
+	std::ofstream hex_output("fw_hex_outbut.txt");
+	if (!hex_output.is_open())
+	{
+		return;
+	}
 
 	int read_index = 0;
 	for (int i = 0; i < num_packets; i++)
@@ -502,27 +590,31 @@ void UploadData(unsigned char* data, std::streamsize len)
 		memset(chunk, 0x26, PACKET_SIZE);
 		memcpy(chunk, &data[read_index], PACKET_SIZE);
 		read_index += PACKET_SIZE;
-		std::cout << "Uploading packet " << (i + 1) << "/" << num_packets << " ";
-		UploadPacket(chunk, i + 1);
-		//ExportPacket(hex_fw, chunk, i + 1);
+
+		int percentage = static_cast<int>(static_cast<float>(i + 1) / static_cast<float>(num_packets) * 100.0f);
+		std::cout << "\rUploading firmware - " << percentage << "%";
+
+		ExportPacket(hex_output, chunk, i + 1);
 	}
 	std::cout << std::endl;
+
+	hex_output.close();
 }
 
 
 void ExportPacket(std::ofstream& output, unsigned char* data, int id)
 {
-	char packet[133] = { 0 };
+	char packet[PACKET_SIZE + 5] = { 0 };
 
 	packet[0] = 0x01;
 	packet[1] = static_cast<unsigned char>(id % 256);
 	packet[2] = static_cast<unsigned char>(255 - (id % 256));
-	memcpy(&packet[3], data, 128);
-	uint16_t crc = CalculateCRC(data, 128);
-	packet[131] = static_cast<unsigned char>(crc >> 8) & 0xFF;
-	packet[132] = static_cast<unsigned char>(crc) & 0xFF;
+	memcpy(&packet[3], data, PACKET_SIZE);
+	uint16_t crc = CalculateCRC(data, PACKET_SIZE);
+	packet[PACKET_SIZE + 3] = static_cast<unsigned char>(crc >> 8) & 0xFF;
+	packet[PACKET_SIZE + 4] = static_cast<unsigned char>(crc) & 0xFF;
 
-	for (int i = 0; i < 133; i++)
+	for (int i = 0; i < (PACKET_SIZE + 5); i++)
 	{
 		output << ToHex(packet[i]);
 	}
@@ -542,56 +634,14 @@ void UploadPacket(unsigned char* data, int id)
 	packet[PACKET_SIZE + 3] = static_cast<unsigned char>(crc >> 8) & 0xFF;
 	packet[PACKET_SIZE + 4] = static_cast<unsigned char>(crc) & 0xFF;
 
-	/*
-	std::cout << std::endl;
-	for (int i = 0; i < (PACKET_SIZE + 5); i++)
-	{
-		std::cout << ToHex(packet[i]);
-	}
-	std::cout << std::endl;
-	*/
-
-	Wait(250);
 	bool success = false;
 	while (!success)
 	{
 		usb->FlushBuffers();
-
 		if (usb->Write(packet, (PACKET_SIZE + 5)))
 		{
-			//usb->FlushBuffers();
-
 			Wait(100);
-
-			unsigned char c = 0;
-
-			c = usb->ReadByte();
-
-			switch (c)
-			{
-				case 0x06:
-				{
-					std::cout << "ACK" << std::endl;
-					success = true;
-				}
-				break;
-				case 0x15:
-				{
-					std::cout << "-";
-				}
-				break;
-				case 0x18:
-				{
-					std::cout << "o";
-				}
-				break;
-				default:
-				{
-					std::cout << ".";
-					//std::cout << c;
-				}
-				break;
-			}
+			success = (usb->ReadByte() == 0x06);
 		}
 	}
 }
@@ -610,19 +660,6 @@ void Reboot()
 
 uint16_t CalculateCRC(unsigned char* data, int len)
 {
-	/*
-	uint16_t result = 0;
-	for (int i = 0; i < len; i++)
-	{
-		result = static_cast<uint16_t>(result >> 8 | static_cast<int>(result) << 8);
-		result ^= static_cast<uint16_t>(data[i]);
-		result ^= static_cast<uint16_t>((result & 0xFF) >> 4);
-		result ^= static_cast<uint16_t>(result << 12);
-		result ^= static_cast<uint16_t>((result & 0xFF) << 5);
-	}
-	return result;
-	*/
-
 	uint16_t crc = 0;
 	for (int i = 0; i < len; i++)
 	{
@@ -631,159 +668,6 @@ uint16_t CalculateCRC(unsigned char* data, int len)
 	return crc;
 }
 
-
-void Sync()
-{
-	usb->FlushBuffers();
-
-	char cmd[2] = { 0x21, 0x20 };
-	IssueCommand(cmd, 2);
-
-	if (usb->Write(cmd, 2))
-	{
-		Wait(ISSUE_CMD_TIMEOUT);
-
-		byte result = usb->ReadByte();
-
-		if (result == 0x12)
-		{
-			std::cout << "In sync!" << std::endl;
-		}
-		else
-		{
-			std::cout << "Not in sync..." << std::endl;
-		}
-	}
-	else
-	{
-		std::cout << "Could not write to serial port..." << std::endl;
-	}
-}
-
-/*
-int xmodemTransmit(unsigned char* src, int srcsz)
-{
-	unsigned char xbuff[1030]; // 1024 for XModem 1k + 3 head chars + 2 crc + nul
-	int bufsz, crc = -1;
-	unsigned char packetno = 1;
-	int i, c, len = 0;
-	int retry;
-
-	for (;;)
-	{
-		for (retry = 0; retry < 16; ++retry)
-		{
-			if ((c = usb->ReadByte()) >= 0)
-			{
-				//std::cout << c;
-				switch (c)
-				{
-				case 'C':
-					crc = 1;
-					goto start_trans;
-				case NAK:
-					crc = 0;
-					goto start_trans;
-				case CAN:
-					if ((c = usb->ReadByte()) == CAN)
-					{
-						usb->WriteByte(ACK);
-						usb->FlushBuffers();
-						return -1;
-					}
-					break;
-				default:
-					break;
-				}
-			}
-		}
-		usb->WriteByte(CAN);
-		usb->WriteByte(CAN);
-		usb->WriteByte(CAN);
-		usb->FlushBuffers();
-		return -2; // no sync 
-
-		for (;;)
-		{
-		start_trans:
-#ifdef TRANSMIT_XMODEM_1K
-			xbuff[0] = STX; bufsz = 1024;
-#else
-			xbuff[0] = SOH; bufsz = 128;
-#endif
-			xbuff[1] = packetno;
-			xbuff[2] = ~packetno;
-			c = srcsz - len;
-			if (c > bufsz) c = bufsz;
-			if (c > 0)
-			{
-				memset(&xbuff[3], 0, bufsz);
-				memcpy(&xbuff[3], &src[len], c);
-				if (c < bufsz) xbuff[3 + c] = CTRLZ;
-				if (crc)
-				{
-					unsigned short ccrc = CalculateCRC((char*)&xbuff[3], bufsz);
-					xbuff[bufsz + 3] = (ccrc >> 8) & 0xFF;
-					xbuff[bufsz + 4] = ccrc & 0xFF;
-				}
-				else
-				{
-					unsigned char ccks = 0;
-					for (i = 3; i < bufsz + 3; ++i)
-					{
-						ccks += xbuff[i];
-					}
-					xbuff[bufsz + 3] = ccks;
-				}
-				for (retry = 0; retry < MAXRETRANS; ++retry)
-				{
-					for (i = 0; i < bufsz + 4 + (crc ? 1 : 0); ++i)
-					{
-						usb->WriteByte(xbuff[i]);
-					}
-					if ((c = usb->ReadByte()) >= 0)
-					{
-						//std::cout << c;
-						switch (c)
-						{
-						case ACK:
-							++packetno;
-							len += bufsz;
-							goto start_trans;
-						case CAN:
-							if ((c = usb->ReadByte()) == CAN)
-							{
-								usb->WriteByte(ACK);
-								usb->FlushBuffers();
-								return -1; // canceled by remote
-							}
-							break;
-						case NAK:
-						default:
-							break;
-						}
-					}
-				}
-				usb->WriteByte(CAN);
-				usb->WriteByte(CAN);
-				usb->WriteByte(CAN);
-				usb->FlushBuffers();
-				return -4; // xmit error
-			}
-			else
-			{
-				for (retry = 0; retry < 10; ++retry)
-				{
-					usb->WriteByte(EOT);
-					if ((c = usb->ReadByte()) == ACK) break;
-				}
-				usb->FlushBuffers();
-				return (c == ACK) ? len : -5;
-			}
-		}
-	}
-}
-*/
 
 std::string ToHex(uint8_t in, char delimiter)
 {
