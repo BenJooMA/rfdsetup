@@ -169,6 +169,49 @@ bool GroundSideSetup()
 
 	Wait(CMD_TIMEOUT);
 
+	ShowCurrentParams();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Setting 'Air Speed' to " << AIR_SPEED << std::endl;
+	SetAirSpeed();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Setting 'Max Window' to " << MAX_WINDOW << std::endl;
+	SetMaxWindow();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Enter Net ID (0-255): " << std::endl;
+	std::string net_id_str = "";
+	std::cin >> net_id_str;
+	uint8_t net_id = 255;
+	int temp_id = -1;
+	try
+	{
+		temp_id = std::stoi(net_id_str);
+	}
+	catch (const std::exception & e)
+	{
+		std::cerr << e.what() << std::endl;
+		return 1;
+	}
+	if ((temp_id >= 0) && (temp_id <= 255))
+	{
+		net_id = static_cast<uint8_t>(temp_id);
+	}
+	else
+	{
+		std::cerr << "Net ID entered is out of range! Valid range is 0-255." << std::endl;
+		return 1;
+	}
+
+	std::cout << "Setting 'Net ID' to " << static_cast<int>(net_id) << std::endl;
+	SetNetID(net_id);
+
+	Wait(CMD_TIMEOUT);
+
 	if (!SerialDisconnect())
 	{
 		return false;

@@ -1,0 +1,95 @@
+-Plug in air-side module
+-Connect to air-side module (make note of port number)
+-Click 'Upload Firmware', select appropriate .glb file and click 'Open'
+-Wait for firmware to upload
+-Click 'Reset to Defaults' and wait 30 seconds
+-Click 'Load Settings'
+-Change 'Air Speed' to 125, 'Max Window' to 20 and 'Net ID' to 255
+-Click 'Save Settings'
+-Disconnect air-side module
+-Unplug air-side module
+
+-Plug in killbox
+-Connect to killbox (make note of port number)
+-Click 'Upload Firmware', select appropriate .glb file and click 'Open'
+-Wait for firmware to upload
+-Click 'Reset to Defaults' and wait 30 seconds
+-Click 'Load Settings'
+-Change 'Air Speed' to 125, 'Max Window' to 20 and 'Net ID' to 255
+-Click 'Save Settings'
+-Disconnect killbox
+-Unplug killbox
+
+-Plug in air-side module
+-Connect to air-side module
+-Go to 'Terminal'
+-Issue command '+++' (response should be also '+++')
+-Issue command 'ATPP' (pin values should all be '1')
+-Issue command 'ATPO=0' (response should be 'ATPO=0' and 'OK')
+-Repeat for pins 1 to 5, e.g.: 'ATPO=3', etc.
+-Issue command 'AT&W' (save settings, response should be 'AT&W' and 'OK')
+-Issue command 'ATPP' (pin values should all be '0')
+
+-Plug in killbox
+-Disconnect air-side module (but do NOT unplug)
+-Connect to killbox
+-Issue command '+++' (response should be also '+++')
+-Make sure both BOTTOM and TOP switches are set to KILL
+-Issue command 'ATPM=0' (response should be 'ATPM=0' and 'OK')
+-Repeat for pins 1 to 5, e.g.: 'ATPM=3', etc.
+-Issue command 'AT&W' (save settings, response should be 'AT&W' and 'OK')
+-Issue command 'ATPP' (pattern should be 1 1 1 0 1 0)
+-Disconnect killbox (but do NOT unplug)
+
+-Connect to air-side module
+-Issue command '+++' (response should be also '+++')
+-Issue command 'ATPC=0,0' (response should be 'ATPC=0,0' and 'OK')
+-Issue command 'ATPC=1,0' (response should be 'ATPC=1,0' and 'OK')
+-Issue command 'ATPC=2,1' (response should be 'ATPC=2,1' and 'OK')
+-Issue command 'ATPC=3,0' (response should be 'ATPC=3,0' and 'OK')
+-Issue command 'ATPC=4,1' (response should be 'ATPC=4,1' and 'OK')
+-Issue command 'ATPC=5,0' (response should be 'ATPC=5,0' and 'OK')
+-Issue command 'AT&W' (save settings, response should be 'AT&W' and 'OK')
+-Issue command 'ATPP' (pattern should be 1 1 1 0 1 0)
+-Disconnect air-side module (but do NOT unplug)
+
+-Set both BOTTOM and TOP switches to LIVE on killbox
+-Unplug killbox
+-Plug in killbox again
+-Connect to killbox
+-Issue command '+++' (response should be also '+++')
+-Issue command 'ATPP' (pattern should be 1 1 1 0 1 0)
+-Grab multimeter, set range to 20V DC
+-Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
+ readings should reflect the pattern '1 0 1 0'
+ (the readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 3.3V, 0.0V)
+-Set both BOTTOM and TOP switches to KILL on killbox
+-Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
+ readings should reflect the pattern '0 1 0 1'
+ (the readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 0.0V, 3.3V)
+-Set BOTTOM switch to LIVE, TOP switch to KILL
+-Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
+ readings should reflect the pattern '1 0 0 1'
+ (the readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 0.0V, 3.3V)
+-Set BOTTOM switch to KILL, TOP switch to LIVE
+-Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
+ readings should reflect the pattern '0 1 1 0'
+ (the readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 3.3V, 0.0V)
+-Disconnect killbox
+-Unplug killbox
+
+-Connect to air-side module
+-Issue command '+++' (response should be also '+++')
+-Issue command 'ATPP' (pattern should be 1 1 0 1 1 0)
+-Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
+ readings should reflect the pattern '0 1 1 0'
+ (the readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 3.3V, 0.0V)
+-Disconnect air-side module
+-Unplug air-side module
+-Plug in air-side again
+-Issue command 'ATPP' (pattern should be 1 1 1 0 1 0)
+-Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
+ readings should reflect the pattern '1 0 1 0'
+ (the readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 3.3V, 0.0V)
+-Disconnect air-side module
+-Unplug air-side module
