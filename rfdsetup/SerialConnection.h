@@ -23,6 +23,7 @@ public:
 	~SerialConnection();
 
 	bool FindNextOpenPort(int& first_port_to_check);
+	bool FindOpenPort(int port_no);
 
 	bool Initialise();
 

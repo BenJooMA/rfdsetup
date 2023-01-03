@@ -54,16 +54,21 @@ static const uint16_t crc16tab[256] = {
 };
 
 
-static char hex_table[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
-								'8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+static const char hex_table[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
+									'8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
 
-bool SerialConnect();
+int SerialConnectAvailable();
+bool SerialConnectSpecific(int port_no);
 bool SerialDisconnect();
 
 
-bool GroundSideSetup();
-bool AirSideSetup();
+bool GroundSideBasicSetup();
+bool AirSideBasicSetup();
+bool FirmwareAndBasicParamsSetup();
+bool AirSidePinSetup();
+bool GroundSidePinSetup();
+bool AirSidePinDefaults();
 
 
 void Wait(unsigned int milliseconds);
@@ -76,13 +81,16 @@ void SetAirSpeed();
 void SetMaxWindow();
 void SetNetID(uint8_t id);
 void SetAllGPIOPinsToZero();
+void MirrorGPIOPins();
+void SetDefaultGPIOPinValues();
+void ResetDefaults();
 void SaveSettings();
 void EnterBootloaderMode();
 void ShowChipID();
 void InitiateUpload();
 void UploadFirmware();
-void UploadData(unsigned char* data, std::streamsize len);
-void ExportData(unsigned char* data, std::streamsize len);
+void UploadData(unsigned char* data, int len);
+void ExportData(unsigned char* data, int len);
 void ExportPacket(std::ofstream& output, unsigned char* data, int id);
 void UploadPacket(unsigned char* data, int id);
 void Reboot();
@@ -92,17 +100,34 @@ uint16_t CalculateCRC(unsigned char* data, int len);
 std::string ToHex(uint8_t in, char delimiter = ' ');
 
 
+static int g_ground_side_port = -1;
+static int g_air_side_port = -1;
 auto usb = std::make_shared<SerialConnection>(BAUD_RATE);
 
 
 int main(int argc, char** argv)
 {
-	if (!GroundSideSetup())
+	if (!AirSideBasicSetup())
 	{
 		return 1;
 	}
 
-	if (!AirSideSetup())
+	if (!GroundSideBasicSetup())
+	{
+		return 1;
+	}
+
+	if (!AirSidePinSetup())
+	{
+		return 1;
+	}
+
+	if (!GroundSidePinSetup())
+	{
+		return 1;
+	}
+
+	if (!AirSidePinDefaults())
 	{
 		return 1;
 	}
@@ -111,7 +136,7 @@ int main(int argc, char** argv)
 }
 
 
-bool GroundSideSetup()
+bool GroundSideBasicSetup()
 {
 	std::cout << "Connect ground-side module (killbox) / power-cycle if already connected..." << std::endl;
 	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
@@ -126,91 +151,15 @@ bool GroundSideSetup()
 
 	Wait(3000);
 
-	if (!SerialConnect())
+	if ((g_ground_side_port = SerialConnectAvailable()) < 0)
 	{
 		return false;
 	}
 
-	Wait(CMD_TIMEOUT);
-
-	EnterATCommandMode();
-
-	Wait(CMD_TIMEOUT);
-
-	ShowFirmwareVersion();
-
-	Wait(CMD_TIMEOUT);
-
-	EnterBootloaderMode();
-
-	Wait(CMD_TIMEOUT);
-
-	InitiateUpload();
-
-	Wait(CMD_TIMEOUT);
-
-	std::cout << usb->ReadByte() << std::endl;
-
-	Wait(CMD_TIMEOUT);
-
-	UploadFirmware();
-
-	Wait(CMD_TIMEOUT);
-
-	Reboot();
-
-	Wait(5000);
-
-	EnterATCommandMode();
-
-	Wait(CMD_TIMEOUT);
-
-	ShowFirmwareVersion();
-
-	Wait(CMD_TIMEOUT);
-
-	ShowCurrentParams();
-
-	Wait(CMD_TIMEOUT);
-
-	std::cout << "Setting 'Air Speed' to " << AIR_SPEED << std::endl;
-	SetAirSpeed();
-
-	Wait(CMD_TIMEOUT);
-
-	std::cout << "Setting 'Max Window' to " << MAX_WINDOW << std::endl;
-	SetMaxWindow();
-
-	Wait(CMD_TIMEOUT);
-
-	std::cout << "Enter Net ID (0-255): " << std::endl;
-	std::string net_id_str = "";
-	std::cin >> net_id_str;
-	uint8_t net_id = 255;
-	int temp_id = -1;
-	try
+	if (!FirmwareAndBasicParamsSetup())
 	{
-		temp_id = std::stoi(net_id_str);
+		return false;
 	}
-	catch (const std::exception & e)
-	{
-		std::cerr << e.what() << std::endl;
-		return 1;
-	}
-	if ((temp_id >= 0) && (temp_id <= 255))
-	{
-		net_id = static_cast<uint8_t>(temp_id);
-	}
-	else
-	{
-		std::cerr << "Net ID entered is out of range! Valid range is 0-255." << std::endl;
-		return 1;
-	}
-
-	std::cout << "Setting 'Net ID' to " << static_cast<int>(net_id) << std::endl;
-	SetNetID(net_id);
-
-	Wait(CMD_TIMEOUT);
 
 	if (!SerialDisconnect())
 	{
@@ -232,7 +181,7 @@ bool GroundSideSetup()
 }
 
 
-bool AirSideSetup()
+bool AirSideBasicSetup()
 {
 	std::cout << "Connect air-side module / power-cycle if already connected..." << std::endl;
 	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
@@ -247,11 +196,38 @@ bool AirSideSetup()
 
 	Wait(3000);
 
-	if (!SerialConnect())
+	if ((g_air_side_port = SerialConnectAvailable()) < 0)
 	{
 		return false;
 	}
 
+	if (!FirmwareAndBasicParamsSetup())
+	{
+		return false;
+	}
+
+	if (!SerialDisconnect())
+	{
+		return false;
+	}
+
+	std::cout << "Disconnect air-side module" << std::endl;
+	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
+	tmp = 0;
+	std::cin >> tmp;
+
+	if (!((tmp == 'c') || (tmp == 'C')))
+	{
+		std::cout << "Quitting..." << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
+
+bool FirmwareAndBasicParamsSetup()
+{
 	Wait(CMD_TIMEOUT);
 
 	EnterATCommandMode();
@@ -263,14 +239,6 @@ bool AirSideSetup()
 	Wait(CMD_TIMEOUT);
 
 	EnterBootloaderMode();
-
-	Wait(CMD_TIMEOUT);
-
-	InitiateUpload();
-
-	Wait(CMD_TIMEOUT);
-
-	std::cout << usb->ReadByte() << std::endl;
 
 	Wait(CMD_TIMEOUT);
 
@@ -287,6 +255,14 @@ bool AirSideSetup()
 	Wait(CMD_TIMEOUT);
 
 	ShowFirmwareVersion();
+
+	Wait(CMD_TIMEOUT);
+
+	ResetDefaults();
+
+	Wait(CMD_TIMEOUT);
+
+	SaveSettings();
 
 	Wait(CMD_TIMEOUT);
 
@@ -316,7 +292,7 @@ bool AirSideSetup()
 	catch (const std::exception & e)
 	{
 		std::cerr << e.what() << std::endl;
-		return 1;
+		return false;
 	}
 	if ((temp_id >= 0) && (temp_id <= 255))
 	{
@@ -325,7 +301,7 @@ bool AirSideSetup()
 	else
 	{
 		std::cerr << "Net ID entered is out of range! Valid range is 0-255." << std::endl;
-		return 1;
+		return false;
 	}
 
 	std::cout << "Setting 'Net ID' to " << static_cast<int>(net_id) << std::endl;
@@ -333,11 +309,45 @@ bool AirSideSetup()
 
 	Wait(CMD_TIMEOUT);
 
+	return true;
+}
+
+
+bool AirSidePinSetup()
+{
+	std::cout << "Connect air-side module / power-cycle if already connected..." << std::endl;
+	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
+	char tmp = 0;
+	std::cin >> tmp;
+
+	if (!((tmp == 'c') || (tmp == 'C')))
+	{
+		std::cout << "Quitting..." << std::endl;
+		return false;
+	}
+
+	Wait(3000);
+
+	if (!SerialConnectSpecific(g_air_side_port))
+	{
+		return false;
+	}
+
+	Wait(CMD_TIMEOUT);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowFirmwareVersion();
+
+	Wait(CMD_TIMEOUT);
+
 	ShowCurrentGPIOState();
 
 	Wait(CMD_TIMEOUT);
 
-	std::cout << "Setting state of each GPIO pins to 0" << std::endl;
+	std::cout << "Setting state of each GPIO pins to 0..." << std::endl;
 	SetAllGPIOPinsToZero();
 
 	Wait(CMD_TIMEOUT);
@@ -359,10 +369,122 @@ bool AirSideSetup()
 }
 
 
-bool SerialConnect()
+bool GroundSidePinSetup()
+{
+	std::cout << "Connect ground-side module (killbox), do NOT unplug air-side module" << std::endl;
+	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
+	char tmp = 0;
+	std::cin >> tmp;
+
+	if (!((tmp == 'c') || (tmp == 'C')))
+	{
+		std::cout << "Quitting..." << std::endl;
+		return false;
+	}
+
+	Wait(3000);
+
+	if (!SerialConnectSpecific(g_ground_side_port))
+	{
+		return false;
+	}
+
+	Wait(CMD_TIMEOUT);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Make sure both BOTTOM and TOP switches are set to KILL..." << std::endl;
+	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
+	tmp = 0;
+	std::cin >> tmp;
+
+	if (!((tmp == 'c') || (tmp == 'C')))
+	{
+		std::cout << "Quitting..." << std::endl;
+		return false;
+	}
+
+	Wait(CMD_TIMEOUT);
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Mirroring GPIO pins..." << std::endl;
+	MirrorGPIOPins();
+
+	Wait(CMD_TIMEOUT);
+
+	SaveSettings();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	if (!SerialDisconnect())
+	{
+		return false;
+	}
+
+	return true;
+}
+
+
+bool AirSidePinDefaults()
+{
+	Wait(1000);
+
+	if (!SerialConnectSpecific(g_air_side_port))
+	{
+		return false;
+	}
+
+	Wait(CMD_TIMEOUT);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Setting default air-side GPIO pin state..." << std::endl;
+	SetDefaultGPIOPinValues();
+
+	Wait(CMD_TIMEOUT);
+
+	SaveSettings();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	if (!SerialDisconnect())
+	{
+		return false;
+	}
+
+	return true;
+}
+
+
+int SerialConnectAvailable()
 {
 	int port_to_check = 0;
 	if (!usb->FindNextOpenPort(port_to_check))
+	{
+		return -1;
+	}
+	return port_to_check;
+}
+
+
+bool SerialConnectSpecific(int port_no)
+{
+	if (!usb->FindOpenPort(port_no))
 	{
 		return false;
 	}
@@ -381,9 +503,9 @@ bool SerialDisconnect()
 }
 
 
-void Wait(unsigned int seconds)
+void Wait(unsigned int milliseconds)
 {
-	std::this_thread::sleep_for(std::chrono::milliseconds(seconds));
+	std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 }
 
 
@@ -514,6 +636,79 @@ void SetAllGPIOPinsToZero()
 }
 
 
+void MirrorGPIOPins()
+{
+	// ATPM=0\r\n
+	char cmd_0[8] = { 0x41, 0x54, 0x50, 0x4D, 0x3D, 0x30, 0x0D, 0x0A };
+	IssueCommand(cmd_0, 8);
+
+	// ATPM=1\r\n
+	char cmd_1[8] = { 0x41, 0x54, 0x50, 0x4D, 0x3D, 0x31, 0x0D, 0x0A };
+	IssueCommand(cmd_1, 8);
+
+	// ATPM=2\r\n
+	char cmd_2[8] = { 0x41, 0x54, 0x50, 0x4D, 0x3D, 0x32, 0x0D, 0x0A };
+	IssueCommand(cmd_2, 8);
+
+	// ATPM=3\r\n
+	char cmd_3[8] = { 0x41, 0x54, 0x50, 0x4D, 0x3D, 0x33, 0x0D, 0x0A };
+	IssueCommand(cmd_3, 8);
+
+	// ATPM=4\r\n
+	char cmd_4[8] = { 0x41, 0x54, 0x50, 0x4D, 0x3D, 0x34, 0x0D, 0x0A };
+	IssueCommand(cmd_4, 8);
+
+	// ATPM=5\r\n
+	char cmd_5[8] = { 0x41, 0x54, 0x50, 0x4D, 0x3D, 0x35, 0x0D, 0x0A };
+	IssueCommand(cmd_5, 8);
+}
+
+
+void SetDefaultGPIOPinValues()
+{
+	// ATPC=0,0\r\n
+	char cmd_0[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x30, 0x2C, 0x30, 0x0D, 0x0A };
+	IssueCommand(cmd_0, 10);
+
+	// ATPC=1,0\r\n
+	char cmd_1[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x31, 0x2C, 0x30, 0x0D, 0x0A };
+	IssueCommand(cmd_1, 10);
+
+	// ATPC=2,1\r\n
+	char cmd_2[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x32, 0x2C, 0x31, 0x0D, 0x0A };
+	IssueCommand(cmd_2, 10);
+
+	// ATPC=3,0\r\n
+	char cmd_3[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x33, 0x2C, 0x30, 0x0D, 0x0A };
+	IssueCommand(cmd_3, 10);
+
+	// ATPC=4,1\r\n
+	char cmd_4[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x34, 0x2C, 0x31, 0x0D, 0x0A };
+	IssueCommand(cmd_4, 10);
+
+	// ATPC=5,0\r\n
+	char cmd_5[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x35, 0x2C, 0x30, 0x0D, 0x0A };
+	IssueCommand(cmd_5, 10);
+}
+
+
+void ResetDefaults()
+{
+	// AT&F\r\n
+	char cmd[6] = { 0x41, 0x54, 0x26, 0x46, 0x0D, 0x0A };
+	IssueCommand(cmd, 6);
+	std::cout << "Setting all parameters to default..." << std::endl;
+	std::cout << std::string(30, '.');
+	for (int i = 0; i < 30; i++)
+	{
+		std::cout << "\r" << std::string(i + 1, '#');
+
+		Wait(1000);
+	}
+	std::cout << std::endl;
+}
+
+
 void SaveSettings()
 {
 	// AT&W\r\n
@@ -561,6 +756,14 @@ void UploadFirmware()
 			std::cerr << "Could not open file..." << std::endl;
 			return;
 		}
+
+		InitiateUpload();
+
+		Wait(CMD_TIMEOUT);
+
+		std::cout << usb->ReadByte() << std::endl;
+
+		Wait(CMD_TIMEOUT);
 	
 		std::streamsize len = fw.tellg();
 		fw.seekg(0, std::ios::beg);
@@ -575,7 +778,7 @@ void UploadFirmware()
 			Wait(100);
 			usb->SetReadTimeout(2000);
 			Wait(100);
-			UploadData(data, len);
+			UploadData(data, static_cast<int>(len));
 			Wait(100);
 			usb->SetBaudRate(BAUD_RATE);
 			Wait(100);
@@ -591,7 +794,7 @@ void UploadFirmware()
 }
 
 
-void UploadData(unsigned char* data, std::streamsize len)
+void UploadData(unsigned char* data, int len)
 {
 	int num_packets = (len % PACKET_SIZE == 0) ? (len / PACKET_SIZE) : (len / PACKET_SIZE + 1);
 	std::cout << "Number of packets required: " << num_packets << std::endl;
@@ -614,7 +817,7 @@ void UploadData(unsigned char* data, std::streamsize len)
 }
 
 
-void ExportData(unsigned char* data, std::streamsize len)
+void ExportData(unsigned char* data, int len)
 {
 	int num_packets = (len % PACKET_SIZE == 0) ? (len / PACKET_SIZE) : (len / PACKET_SIZE + 1);
 	std::cout << "Number of packets required: " << num_packets << std::endl;

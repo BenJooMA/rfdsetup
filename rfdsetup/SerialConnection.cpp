@@ -36,14 +36,14 @@ bool SerialConnection::FindNextOpenPort(int& first_port_to_check)
 	{
 		std::string port_num_str = port_str + std::to_string(i);
 
-		std::cout << "Checking port " << port_num_str << "..." << std::endl;
+		//std::cout << "Checking port " << port_num_str << "..." << std::endl;
 
 		HANDLE port = CreateFileA(port_num_str.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
 			FILE_ATTRIBUTE_NORMAL, 0);
 
 		if (port == INVALID_HANDLE_VALUE)
 		{
-			std::cout << "Could not open port " << port_num_str << std::endl;
+			//std::cout << "Could not open port " << port_num_str << std::endl;
 			continue;
 		}
 		else
@@ -83,6 +83,51 @@ bool SerialConnection::FindNextOpenPort(int& first_port_to_check)
 	}
 
 	return success;
+}
+
+
+bool SerialConnection::FindOpenPort(int port_no)
+{
+	std::string port_str = "\\\\.\\COM";
+	std::string port_num_str = port_str + std::to_string(port_no);
+
+	HANDLE port = CreateFileA(port_num_str.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL, 0);
+
+	if (port == INVALID_HANDLE_VALUE)
+	{
+		return false;
+	}
+
+	std::cout << "Port " << port_num_str << " successfully opened" << std::endl;
+	m_Port = port;
+	m_Path = port_num_str;
+
+
+	DCB serialParams = { 0 };
+	serialParams.DCBlength = sizeof(serialParams);
+
+	GetCommState(m_Port, &serialParams);
+	serialParams.BaudRate = m_Baudrate;
+	serialParams.ByteSize = 8;
+	serialParams.StopBits = ONESTOPBIT;
+	serialParams.Parity = NOPARITY;
+	if (SetCommState(m_Port, &serialParams) == 0)
+	{
+		std::cerr << "Failed to configure port: " << GetLastError() << std::endl;
+		return false;
+	}
+
+	COMMTIMEOUTS timeout = { 0 };
+	timeout.ReadTotalTimeoutConstant = 500;
+	timeout.WriteTotalTimeoutConstant = 500;
+	if (SetCommTimeouts(m_Port, &timeout) == 0)
+	{
+		std::cerr << "Failed to set time-out parameters: " << GetLastError() << std::endl;
+		return false;
+	}
+
+	return true;
 }
 
 
