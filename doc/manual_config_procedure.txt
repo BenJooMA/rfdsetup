@@ -34,7 +34,7 @@
 -Disconnect air-side module (but do NOT unplug)
 -Connect to killbox
 -Issue command '+++' (response should be also '+++')
--Make sure both BOTTOM and TOP switches are set to KILL
+-Make sure both BOTTOM and TOP switches are set to LIVE
 -Issue command 'ATPM=0' (response should be 'ATPM=0' and 'OK')
 -Repeat for pins 1 to 5, e.g.: 'ATPM=3', etc.
 -Issue command 'AT&W' (save settings, response should be 'AT&W' and 'OK')
@@ -43,8 +43,8 @@
 
 -Connect to air-side module
 -Issue command '+++' (response should be also '+++')
--Issue command 'ATPC=0,0' (response should be 'ATPC=0,0' and 'OK')
--Issue command 'ATPC=1,0' (response should be 'ATPC=1,0' and 'OK')
+-Issue command 'ATPC=0,1' (response should be 'ATPC=0,1' and 'OK')
+-Issue command 'ATPC=1,1' (response should be 'ATPC=1,1' and 'OK')
 -Issue command 'ATPC=2,1' (response should be 'ATPC=2,1' and 'OK')
 -Issue command 'ATPC=3,0' (response should be 'ATPC=3,0' and 'OK')
 -Issue command 'ATPC=4,1' (response should be 'ATPC=4,1' and 'OK')
@@ -53,25 +53,25 @@
 -Issue command 'ATPP' (pattern should be 1 1 1 0 1 0)
 -Disconnect air-side module (but do NOT unplug)
 
--Set both BOTTOM and TOP switches to LIVE on killbox
+-Set both BOTTOM and TOP switches to KILL on killbox
 -Unplug killbox
 -Plug in killbox again
 -Connect to killbox
 -Issue command '+++' (response should be also '+++')
--Issue command 'ATPP' (pattern should be 1 1 1 0 1 0)
+-Issue command 'ATPP' (pattern should be 1 1 0 1 0 1)
 -Grab multimeter, set range to 20V DC
--Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
- readings should reflect the pattern '1 0 1 0'
- (the readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 3.3V, 0.0V)
--Set both BOTTOM and TOP switches to KILL on killbox
 -Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
  readings should reflect the pattern '0 1 0 1'
  (the readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 0.0V, 3.3V)
--Set BOTTOM switch to LIVE, TOP switch to KILL
+-Set both BOTTOM and TOP switches to LIVE on killbox
+-Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
+ readings should reflect the pattern '1 0 1 0'
+ (the readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 3.3V, 0.0V)
+-Set BOTTOM switch to KILL, TOP switch to LIVE
 -Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
  readings should reflect the pattern '1 0 0 1'
  (the readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 0.0V, 3.3V)
--Set BOTTOM switch to KILL, TOP switch to LIVE
+-Set BOTTOM switch to LIVE, TOP switch to KILL
 -Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
  readings should reflect the pattern '0 1 1 0'
  (the readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 3.3V, 0.0V)

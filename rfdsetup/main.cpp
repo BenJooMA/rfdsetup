@@ -120,6 +120,7 @@ int main(int argc, char** argv)
 	g_ground_side_port = 9;
 	g_air_side_port = 10;
 	*/
+
 	if (!AirSideBasicSetup())
 	{
 		return 1;
@@ -389,7 +390,7 @@ bool GroundSidePinSetup()
 
 	Wait(CMD_TIMEOUT);
 
-	if (!PromptUser("Make sure both BOTTOM and TOP switches are set to KILL..."))
+	if (!PromptUser("Make sure both BOTTOM and TOP switches are set to LIVE..."))
 	{
 		return false;
 	}
@@ -465,7 +466,7 @@ bool AirSidePinDefaults()
 
 bool CheckPinOutputs()
 {
-	if (!PromptUser("With both modules still plugged in, set both BOTTOM and TOP switches to LIVE on killbox..."))
+	if (!PromptUser("With both modules still plugged in, set both BOTTOM and TOP switches to KILL on killbox..."))
 	{
 		return false;
 	}
@@ -493,12 +494,12 @@ bool CheckPinOutputs()
 	Wait(CMD_TIMEOUT);
 	
 	std::cout << "Measure voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5..." << std::endl;
-	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 3.3V, 0.0V"))
+	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 0.0V, 3.3V"))
 	{
 		return false;
 	}
 
-	if (!PromptUser("Set both BOTTOM and TOP switches to KILL on killbox..."))
+	if (!PromptUser("Set both BOTTOM and TOP switches to LIVE on killbox..."))
 	{
 		return false;
 	}
@@ -508,12 +509,12 @@ bool CheckPinOutputs()
 	Wait(CMD_TIMEOUT);
 
 	std::cout << "Repeat measurement between ground and pins 2, 3, 4 and 5..." << std::endl;
-	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 0.0V, 3.3V"))
+	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 3.3V, 0.0V"))
 	{
 		return false;
 	}
 
-	if (!PromptUser("Set BOTTOM switch to LIVE, TOP switch to KILL on killbox..."))
+	if (!PromptUser("Set BOTTOM switch to KILL, TOP switch to LIVE on killbox..."))
 	{
 		return false;
 	}
@@ -528,7 +529,7 @@ bool CheckPinOutputs()
 		return false;
 	}
 
-	if (!PromptUser("Set BOTTOM switch to KILL, TOP switch to LIVE on killbox..."))
+	if (!PromptUser("Set BOTTOM switch to LIVE, TOP switch to KILL on killbox..."))
 	{
 		return false;
 	}
@@ -853,12 +854,12 @@ void MirrorGPIOPins()
 
 void SetDefaultGPIOPinValues()
 {
-	// ATPC=0,0\r\n
-	char cmd_0[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x30, 0x2C, 0x30, 0x0D, 0x0A };
+	// ATPC=0,1\r\n
+	char cmd_0[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x30, 0x2C, 0x31, 0x0D, 0x0A };
 	IssueCommand(cmd_0, 10);
 
-	// ATPC=1,0\r\n
-	char cmd_1[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x31, 0x2C, 0x30, 0x0D, 0x0A };
+	// ATPC=1,1\r\n
+	char cmd_1[10] = { 0x41, 0x54, 0x50, 0x43, 0x3D, 0x31, 0x2C, 0x31, 0x0D, 0x0A };
 	IssueCommand(cmd_1, 10);
 
 	// ATPC=2,1\r\n
