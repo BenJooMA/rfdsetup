@@ -69,8 +69,12 @@ bool FirmwareAndBasicParamsSetup();
 bool AirSidePinSetup();
 bool GroundSidePinSetup();
 bool AirSidePinDefaults();
+bool CheckPinOutputs();
 
-
+bool PromptUser(
+	const std::string instruction_to_show,
+	char ch_to_continue = 'c'
+);
 void Wait(unsigned int milliseconds);
 void IssueCommand(char* cmd, int len);
 void EnterATCommandMode();
@@ -132,20 +136,19 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	if (!CheckPinOutputs())
+	{
+		return 1;
+	}
+
 	return 0;
 }
 
 
 bool GroundSideBasicSetup()
 {
-	std::cout << "Connect ground-side module (killbox) / power-cycle if already connected..." << std::endl;
-	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
-	char tmp = 0;
-	std::cin >> tmp;
-
-	if (!((tmp == 'c') || (tmp == 'C')))
+	if (!PromptUser("Connect ground-side module (killbox) / power-cycle if already connected..."))
 	{
-		std::cout << "Quitting..." << std::endl;
 		return false;
 	}
 
@@ -166,14 +169,8 @@ bool GroundSideBasicSetup()
 		return false;
 	}
 
-	std::cout << "Disconnect ground-side module" << std::endl;
-	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
-	tmp = 0;
-	std::cin >> tmp;
-
-	if (!((tmp == 'c') || (tmp == 'C')))
+	if (!PromptUser("Disconnect ground-side module..."))
 	{
-		std::cout << "Quitting..." << std::endl;
 		return false;
 	}
 
@@ -183,14 +180,8 @@ bool GroundSideBasicSetup()
 
 bool AirSideBasicSetup()
 {
-	std::cout << "Connect air-side module / power-cycle if already connected..." << std::endl;
-	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
-	char tmp = 0;
-	std::cin >> tmp;
-
-	if (!((tmp == 'c') || (tmp == 'C')))
+	if (!PromptUser("Connect air-side module / power-cycle if already connected..."))
 	{
-		std::cout << "Quitting..." << std::endl;
 		return false;
 	}
 
@@ -211,14 +202,8 @@ bool AirSideBasicSetup()
 		return false;
 	}
 
-	std::cout << "Disconnect air-side module" << std::endl;
-	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
-	tmp = 0;
-	std::cin >> tmp;
-
-	if (!((tmp == 'c') || (tmp == 'C')))
+	if (!PromptUser("Disconnect air-side module..."))
 	{
-		std::cout << "Quitting..." << std::endl;
 		return false;
 	}
 
@@ -309,20 +294,18 @@ bool FirmwareAndBasicParamsSetup()
 
 	Wait(CMD_TIMEOUT);
 
+	SaveSettings();
+
+	Wait(CMD_TIMEOUT);
+
 	return true;
 }
 
 
 bool AirSidePinSetup()
 {
-	std::cout << "Connect air-side module / power-cycle if already connected..." << std::endl;
-	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
-	char tmp = 0;
-	std::cin >> tmp;
-
-	if (!((tmp == 'c') || (tmp == 'C')))
+	if (!PromptUser("Connect air-side module / power-cycle if already connected..."))
 	{
-		std::cout << "Quitting..." << std::endl;
 		return false;
 	}
 
@@ -371,14 +354,8 @@ bool AirSidePinSetup()
 
 bool GroundSidePinSetup()
 {
-	std::cout << "Connect ground-side module (killbox), do NOT unplug air-side module" << std::endl;
-	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
-	char tmp = 0;
-	std::cin >> tmp;
-
-	if (!((tmp == 'c') || (tmp == 'C')))
+	if (!PromptUser("Connect ground-side module (killbox), do NOT unplug air-side module..."))
 	{
-		std::cout << "Quitting..." << std::endl;
 		return false;
 	}
 
@@ -395,14 +372,8 @@ bool GroundSidePinSetup()
 
 	Wait(CMD_TIMEOUT);
 
-	std::cout << "Make sure both BOTTOM and TOP switches are set to KILL..." << std::endl;
-	std::cout << "Enter 'c' to continue or any other key to quit and press ENTER..." << std::endl;
-	tmp = 0;
-	std::cin >> tmp;
-
-	if (!((tmp == 'c') || (tmp == 'C')))
+	if (!PromptUser("Make sure both BOTTOM and TOP switches are set to KILL..."))
 	{
-		std::cout << "Quitting..." << std::endl;
 		return false;
 	}
 
@@ -471,6 +442,13 @@ bool AirSidePinDefaults()
 }
 
 
+bool CheckPinOutputs()
+{
+
+	return true;
+}
+
+
 int SerialConnectAvailable()
 {
 	int port_to_check = 0;
@@ -499,6 +477,26 @@ bool SerialDisconnect()
 		std::cerr << "Failed to disconnect serial port..." << std::endl;
 		return false;
 	}
+	return true;
+}
+
+
+bool PromptUser(
+	const std::string instruction_to_show,
+	char ch_to_continue
+)
+{
+	std::cout << instruction_to_show << std::endl;
+	std::cout << "Enter " << ch_to_continue << " to continue or any other key to quit and press ENTER..." << std::endl;
+	char tmp = 0;
+	std::cin >> tmp;
+
+	if (!((tmp == ch_to_continue) || (tmp == (ch_to_continue - 32))))
+	{
+		std::cout << "Quitting..." << std::endl;
+		return false;
+	}
+
 	return true;
 }
 
@@ -697,15 +695,6 @@ void ResetDefaults()
 	// AT&F\r\n
 	char cmd[6] = { 0x41, 0x54, 0x26, 0x46, 0x0D, 0x0A };
 	IssueCommand(cmd, 6);
-	std::cout << "Setting all parameters to default..." << std::endl;
-	std::cout << std::string(30, '.');
-	for (int i = 0; i < 30; i++)
-	{
-		std::cout << "\r" << std::string(i + 1, '#');
-
-		Wait(1000);
-	}
-	std::cout << std::endl;
 }
 
 
@@ -750,7 +739,6 @@ void UploadFirmware()
 	if ((path_str == "d") || (path_str == "D"))
 	{
 		std::ifstream fw("C:\\tmp\\rfd\\fw_3_54.gbl", std::ios::binary | std::ios::ate);
-		//std::ifstream fw("C:\\tmp\\rfd\\fw_4_03.gbl", std::ios::binary | std::ios::ate);
 		if (!fw.is_open())
 		{
 			std::cerr << "Could not open file..." << std::endl;
@@ -772,8 +760,6 @@ void UploadFirmware()
 		{
 			std::cout << "Successfully read " << len << " bytes into 'data'..." << std::endl;
 
-			//usb->SetBaudRate(115200);
-			//Wait(100);
 			usb->FlushBuffers();
 			Wait(100);
 			usb->SetReadTimeout(2000);
@@ -886,7 +872,6 @@ void UploadPacket(unsigned char* data, int id)
 		usb->FlushBuffers();
 		if (usb->Write(packet, (PACKET_SIZE + 5)))
 		{
-			Wait(100);
 			success = (usb->ReadByte() == 0x06);
 		}
 	}
