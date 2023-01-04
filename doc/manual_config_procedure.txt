@@ -87,6 +87,8 @@
 -Disconnect air-side module
 -Unplug air-side module
 -Plug in air-side again
+-Connect to air-side module
+-Issue command '+++' (response should be also '+++')
 -Issue command 'ATPP' (pattern should be 1 1 1 0 1 0)
 -Check voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5
  readings should reflect the pattern '1 0 1 0'

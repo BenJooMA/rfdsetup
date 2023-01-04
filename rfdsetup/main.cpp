@@ -5,6 +5,9 @@
 #include <fstream>
 
 
+#include <boost/filesystem.hpp>
+
+
 #include "SerialConnection.h"
 
 
@@ -70,6 +73,7 @@ bool AirSidePinSetup();
 bool GroundSidePinSetup();
 bool AirSidePinDefaults();
 bool CheckPinOutputs();
+bool CheckAirSideDefaults();
 
 bool PromptUser(
 	const std::string instruction_to_show,
@@ -81,6 +85,7 @@ void EnterATCommandMode();
 void ShowFirmwareVersion();
 void ShowCurrentParams();
 void ShowCurrentGPIOState();
+void ShowCurrentRemoteGPIOState();
 void SetAirSpeed();
 void SetMaxWindow();
 void SetNetID(uint8_t id);
@@ -111,6 +116,10 @@ auto usb = std::make_shared<SerialConnection>(BAUD_RATE);
 
 int main(int argc, char** argv)
 {
+	/*
+	g_ground_side_port = 9;
+	g_air_side_port = 10;
+	*/
 	if (!AirSideBasicSetup())
 	{
 		return 1;
@@ -120,7 +129,7 @@ int main(int argc, char** argv)
 	{
 		return 1;
 	}
-
+	
 	if (!AirSidePinSetup())
 	{
 		return 1;
@@ -141,13 +150,21 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	if (!CheckAirSideDefaults())
+	{
+		return 1;
+	}
+
+	std::cout << "RFD config is complete!" << std::endl;
+	std::cout << "Quitting..." << std::endl;
+
 	return 0;
 }
 
 
 bool GroundSideBasicSetup()
 {
-	if (!PromptUser("Connect ground-side module (killbox) / power-cycle if already connected..."))
+	if (!PromptUser("Plug in ground-side module (killbox) / power-cycle if already connected..."))
 	{
 		return false;
 	}
@@ -169,7 +186,7 @@ bool GroundSideBasicSetup()
 		return false;
 	}
 
-	if (!PromptUser("Disconnect ground-side module..."))
+	if (!PromptUser("Unplug ground-side module (killbox)..."))
 	{
 		return false;
 	}
@@ -180,7 +197,7 @@ bool GroundSideBasicSetup()
 
 bool AirSideBasicSetup()
 {
-	if (!PromptUser("Connect air-side module / power-cycle if already connected..."))
+	if (!PromptUser("Plug in air-side module / power-cycle if already connected..."))
 	{
 		return false;
 	}
@@ -202,7 +219,7 @@ bool AirSideBasicSetup()
 		return false;
 	}
 
-	if (!PromptUser("Disconnect air-side module..."))
+	if (!PromptUser("Unplug air-side module..."))
 	{
 		return false;
 	}
@@ -304,7 +321,7 @@ bool FirmwareAndBasicParamsSetup()
 
 bool AirSidePinSetup()
 {
-	if (!PromptUser("Connect air-side module / power-cycle if already connected..."))
+	if (!PromptUser("Plug in air-side module / power-cycle if already connected..."))
 	{
 		return false;
 	}
@@ -354,7 +371,7 @@ bool AirSidePinSetup()
 
 bool GroundSidePinSetup()
 {
-	if (!PromptUser("Connect ground-side module (killbox), do NOT unplug air-side module..."))
+	if (!PromptUser("Plug in ground-side module (killbox), do NOT unplug air-side module..."))
 	{
 		return false;
 	}
@@ -393,6 +410,10 @@ bool GroundSidePinSetup()
 	Wait(CMD_TIMEOUT);
 
 	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowCurrentRemoteGPIOState();
 
 	Wait(CMD_TIMEOUT);
 
@@ -444,6 +465,165 @@ bool AirSidePinDefaults()
 
 bool CheckPinOutputs()
 {
+	if (!PromptUser("With both modules still plugged in, set both BOTTOM and TOP switches to LIVE on killbox..."))
+	{
+		return false;
+	}
+
+	if (!PromptUser("Unplug killbox and plug it back in..."))
+	{
+		return false;
+	}
+
+	Wait(3000);
+
+	if (!SerialConnectSpecific(g_ground_side_port))
+	{
+		return false;
+	}
+
+	Wait(CMD_TIMEOUT);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+	
+	std::cout << "Measure voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5..." << std::endl;
+	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 3.3V, 0.0V"))
+	{
+		return false;
+	}
+
+	if (!PromptUser("Set both BOTTOM and TOP switches to KILL on killbox..."))
+	{
+		return false;
+	}
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Repeat measurement between ground and pins 2, 3, 4 and 5..." << std::endl;
+	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 0.0V, 3.3V"))
+	{
+		return false;
+	}
+
+	if (!PromptUser("Set BOTTOM switch to LIVE, TOP switch to KILL on killbox..."))
+	{
+		return false;
+	}
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Repeat measurement between ground and pins 2, 3, 4 and 5..." << std::endl;
+	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 0.0V, 3.3V"))
+	{
+		return false;
+	}
+
+	if (!PromptUser("Set BOTTOM switch to KILL, TOP switch to LIVE on killbox..."))
+	{
+		return false;
+	}
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Repeat measurement between ground and pins 2, 3, 4 and 5..." << std::endl;
+	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 3.3V, 0.0V"))
+	{
+		return false;
+	}
+
+	if (!SerialDisconnect())
+	{
+		return false;
+	}
+
+	if (!PromptUser("Unplug ground-side module (killbox)..."))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+
+bool CheckAirSideDefaults()
+{
+	Wait(3000);
+
+	if (!SerialConnectSpecific(g_air_side_port))
+	{
+		return false;
+	}
+
+	Wait(3000);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Measure voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5..." << std::endl;
+	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 0.0V, 3.3V, 3.3V, 0.0V"))
+	{
+		return false;
+	}
+
+	if (!SerialDisconnect())
+	{
+		return false;
+	}
+
+	if (!PromptUser("Unplug air-side module and plug it back in..."))
+	{
+		return false;
+	}
+
+	Wait(3000);
+
+	if (!SerialConnectSpecific(g_air_side_port))
+	{
+		return false;
+	}
+
+	Wait(CMD_TIMEOUT);
+
+	EnterATCommandMode();
+
+	Wait(CMD_TIMEOUT);
+
+	ShowCurrentGPIOState();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << "Measure voltages between ground (rightmost pin in top row) and pins 2, 3, 4 and 5..." << std::endl;
+	if (!PromptUser("The readings FROM RIGHT TO LEFT should be as follows: 3.3V, 0.0V, 3.3V, 0.0V"))
+	{
+		return false;
+	}
+
+	if (!SerialDisconnect())
+	{
+		return false;
+	}
+
+	if (!PromptUser("Unplug air-side module..."))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -487,7 +667,7 @@ bool PromptUser(
 )
 {
 	std::cout << instruction_to_show << std::endl;
-	std::cout << "Enter " << ch_to_continue << " to continue or any other key to quit and press ENTER..." << std::endl;
+	std::cout << "Hit '" << ch_to_continue << "' to continue or any other key to quit and press ENTER...";
 	char tmp = 0;
 	std::cin >> tmp;
 
@@ -538,6 +718,7 @@ void EnterATCommandMode()
 	// +++
 	char cmd[3] = { 0x2B, 0x2B, 0x2B };
 	IssueCommand(cmd, 3);
+	IssueCommand(cmd, 3);
 }
 
 
@@ -561,6 +742,14 @@ void ShowCurrentGPIOState()
 {
 	// ATPP\r\n
 	char cmd[6] = { 0x41, 0x54, 0x50, 0x50, 0x0D, 0x0A };
+	IssueCommand(cmd, 6);
+}
+
+
+void ShowCurrentRemoteGPIOState()
+{
+	// RTPP\r\n
+	char cmd[6] = { 0x52, 0x54, 0x50, 0x50, 0x0D, 0x0A };
 	IssueCommand(cmd, 6);
 }
 
@@ -733,58 +922,72 @@ void InitiateUpload()
 
 void UploadFirmware()
 {
-	std::cout << "Enter firmware path or 'd' for using default path: " << std::endl;
-	std::string path_str = "";
-	std::cin >> path_str;
-	if ((path_str == "d") || (path_str == "D"))
+	std::string path = "fw\\";
+
+	std::cout << "Fetching firmware binary..." << std::endl;
+	if (boost::filesystem::exists(path) && boost::filesystem::is_directory(path))
 	{
-		std::ifstream fw("C:\\tmp\\rfd\\fw_3_54.gbl", std::ios::binary | std::ios::ate);
-		if (!fw.is_open())
+		for (boost::filesystem::directory_entry& p : boost::filesystem::directory_iterator(path))
 		{
-			std::cerr << "Could not open file..." << std::endl;
-			return;
+			if (boost::filesystem::is_regular_file(p))
+			{
+				auto fw_file = static_cast<boost::filesystem::path>(p);
+				if (fw_file.filename().extension() == ".gbl")
+				{
+					path += fw_file.filename().string();
+					std::cout << path << std::endl;
+				}
+			}
 		}
-
-		InitiateUpload();
-
-		Wait(CMD_TIMEOUT);
-
-		std::cout << usb->ReadByte() << std::endl;
-
-		Wait(CMD_TIMEOUT);
-	
-		std::streamsize len = fw.tellg();
-		fw.seekg(0, std::ios::beg);
-		unsigned char* data = new unsigned char[len];
-		if (fw.read((char*)data, len))
-		{
-			std::cout << "Successfully read " << len << " bytes into 'data'..." << std::endl;
-
-			usb->FlushBuffers();
-			Wait(100);
-			usb->SetReadTimeout(2000);
-			Wait(100);
-			UploadData(data, static_cast<int>(len));
-			Wait(100);
-			usb->SetBaudRate(BAUD_RATE);
-			Wait(100);
-			usb->WriteByte(0x04);
-			Wait(100);
-		}
-		delete[] data;
 	}
 	else
 	{
-		std::cout << "Path not recognized..." << std::endl;
+		std::cout << "Firmware binary not found..." << std::endl;
+		return;
 	}
+
+	std::ifstream fw(path.c_str(), std::ios::binary | std::ios::ate);
+	if (!fw.is_open())
+	{
+		std::cerr << "Could not open file..." << std::endl;
+		return;
+	}
+
+	InitiateUpload();
+
+	Wait(CMD_TIMEOUT);
+
+	std::cout << usb->ReadByte() << std::endl;
+
+	Wait(CMD_TIMEOUT);
+
+	std::streamsize len = fw.tellg();
+	fw.seekg(0, std::ios::beg);
+	unsigned char* data = new unsigned char[len];
+	if (fw.read((char*)data, len))
+	{
+		//std::cout << "Successfully read " << len << " bytes into 'data'..." << std::endl;
+
+		usb->FlushBuffers();
+		Wait(100);
+		usb->SetReadTimeout(2000);
+		Wait(100);
+		UploadData(data, static_cast<int>(len));
+		Wait(100);
+		usb->SetBaudRate(BAUD_RATE);
+		Wait(100);
+		usb->WriteByte(0x04);
+		Wait(100);
+	}
+	delete[] data;
 }
 
 
 void UploadData(unsigned char* data, int len)
 {
 	int num_packets = (len % PACKET_SIZE == 0) ? (len / PACKET_SIZE) : (len / PACKET_SIZE + 1);
-	std::cout << "Number of packets required: " << num_packets << std::endl;
-	std::cout << std::endl;
+	//std::cout << "Number of packets required: " << num_packets << std::endl;
+	//std::cout << std::endl;
 
 	int read_index = 0;
 	for (int i = 0; i < num_packets; i++)

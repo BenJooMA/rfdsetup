@@ -48,7 +48,7 @@ bool SerialConnection::FindNextOpenPort(int& first_port_to_check)
 		}
 		else
 		{
-			std::cout << "Port " << port_num_str << " successfully opened" << std::endl;
+			std::cout << port_num_str << " successfully opened" << std::endl;
 			success = true;
 			m_Port = port;
 			m_Path = port_num_str;

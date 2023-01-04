@@ -8,7 +8,7 @@
 #include <chrono>
 
 
-#define MAX_PORT_NUM	20 // 25
+#define MAX_PORT_NUM	40 // 25
 
 
 using byte = unsigned char;
