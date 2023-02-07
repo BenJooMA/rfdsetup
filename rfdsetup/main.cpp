@@ -121,42 +121,52 @@ int main(int argc, char** argv)
 	g_air_side_port = 10;
 	*/
 
+	bool successful_configuration = true;
+
 	if (!AirSideBasicSetup())
 	{
-		return 1;
+		//return 1;
 	}
 
 	if (!GroundSideBasicSetup())
 	{
-		return 1;
+		//return 1;
 	}
 	
 	if (!AirSidePinSetup())
 	{
-		return 1;
+		successful_configuration = false;
+		//return 1;
 	}
 
 	if (!GroundSidePinSetup())
 	{
-		return 1;
+		successful_configuration = false;
+		//return 1;
 	}
 
 	if (!AirSidePinDefaults())
 	{
-		return 1;
+		successful_configuration = false;
+		//return 1;
 	}
 
 	if (!CheckPinOutputs())
 	{
-		return 1;
+		successful_configuration = false;
+		//return 1;
 	}
 
 	if (!CheckAirSideDefaults())
 	{
-		return 1;
+		successful_configuration = false;
+		//return 1;
 	}
 
-	std::cout << "RFD config is complete!" << std::endl;
+	if (successful_configuration)
+	{
+		std::cout << "RFD config is complete!" << std::endl;
+	}
 	std::cout << "Quitting..." << std::endl;
 
 	return 0;
@@ -668,13 +678,13 @@ bool PromptUser(
 )
 {
 	std::cout << instruction_to_show << std::endl;
-	std::cout << "Hit '" << ch_to_continue << "' to continue or any other key to quit and press ENTER...";
+	std::cout << "Hit '" << ch_to_continue << "' to continue or any other key to skip this step and press ENTER...";
 	char tmp = 0;
 	std::cin >> tmp;
 
 	if (!((tmp == ch_to_continue) || (tmp == (ch_to_continue - 32))))
 	{
-		std::cout << "Quitting..." << std::endl;
+		std::cout << "Skipping step..." << std::endl;
 		return false;
 	}
 
